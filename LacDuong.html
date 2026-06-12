@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tra cứu thông tin thửa đất xã LẠC DƯƠNG</title>
+    
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/css/ol.css">
+    
+    <style>
+        html, body { margin:0; padding:0; height:100%; font-family:'Segoe UI', Arial, sans-serif; overflow: hidden; background:#f4f6f9; }
+        
+        /* ── GIAO DIỆN WEBGIS CHÍNH ── */
+        #webgis-container { display: block; height: 100%; width: 100%; position: relative; }
+
+        .system-main-title {
+            position: absolute;
+            top: 60px; left: 50%; transform: translateX(-50%); z-index: 999;
+            background: #1a252f; padding: 10px 30px; border-radius: 0 0 12px 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25); border: 1px solid #111a22; border-top: none; pointer-events: none;
+        }
+        .system-main-title h1 { margin: 0; font-size: 18px; font-weight: bold; color: #ffffff;
+            text-transform: uppercase; letter-spacing: 0.8px; text-align: center; }
+
+        #map { width:100%; height:100vh; background:#e8eef4; position: relative;}
+
+        /* Chú thích loại đất */
+        .ol-legend { top: 65px; left: .5em; }
+        .ol-legend button {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-weight: bold; font-size: 11px; cursor: pointer;
+            background-color: #2ea44f !important; color: white !important; border: 1px solid #237e3d;
+            border-radius: 6px; width: auto !important; height: auto !important; padding: 6px 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s ease; display: flex;
+            flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1.2;
+        }
+        .ol-legend button .legend-icon { font-size: 18px; }
+        .ol-legend button:hover { background-color: #237e3d !important; transform: scale(1.04); }
+
+        .legend-panel {
+            display: none; position: absolute; top: 130px; left: .5em; background: white; border: 1px solid #ccc;
+            border-radius: 6px; padding: 12px; min-width: 290px; max-width: 320px; max-height: 400px; overflow-y: auto;
+            z-index: 2000; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .legend-panel h4 { margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #1a252f; text-transform: uppercase; border-bottom: 2px solid #2ea44f; padding-bottom: 6px; }
+        .legend-section-title { font-size: 11px; font-weight: bold; color: #555; margin: 8px 0 4px 0; text-decoration: underline; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; font-size: 12px; color: #333; }
+        .legend-color { width: 28px; height: 16px; margin-right: 8px; border: 1px solid #555; border-radius: 2px; flex-shrink: 0; }
+        .legend-text { line-height: 1.3; }
+
+        /* Mặc định ẩn thanh tìm kiếm và download khi chưa phân quyền đăng nhập */
+        .search-container-dropdown { position: relative; display: inline-block; margin-top: 8px; }
+        #search-tool-wrapper, #btn-download-doc-wrapper { display: none; }
+
+        .btn-search-toggle { background: #333; color: #fff; border: 1px solid #444; padding: 6px 12px; border-radius: 4px; }
+        .btn-search-toggle:hover, .btn-search-toggle:focus { background: #444; color: #fff; }
+        
+        .search-box-panel {
+            display: none; position: absolute; top: 40px; left: 0; background: #222; border: 1px solid #444; border-radius: 6px;
+            padding: 15px; min-width: 320px; z-index: 2000; box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+        }
+        .search-type-select { background: #333; color: white; border: 1px solid #555; padding: 6px; width: 100%; border-radius: 4px; margin-bottom: 12px; font-size: 12px; }
+        .search-input-group { display: none !important; }
+        .search-input-group.active { display: block !important; }
+        .search-input-group .form-control { background: #fff; color: #333; margin-bottom: 8px; font-size: 13px; height: 34px; }
+        
+        .dropdown-menu-measure { background: #222 !important; padding: 15px !important; border: 1px solid #444 !important; border-radius: 8px !important; min-width: 240px; }
+        .measure-btn-group { display: flex; flex-direction: column; gap: 8px; }
+        .measure-btn-group .btn { text-align: left; padding: 8px 12px; }
+
+        /* Tooltip hiển thị nhãn số liệu khi đang đo */
+        .ol-tooltip { position: relative; background: rgba(0, 0, 0, 0.85); border-radius: 4px; color: white; padding: 4px 8px; opacity: 0.85; white-space: nowrap; font-size: 12px; font-weight: bold; }
+        .ol-tooltip-measure { opacity: 1; background: #222; border: 1px solid #ffaa00; color: #ffaa00; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        .ol-tooltip-static { background: #ffaa00; color: #111; border: 1px solid white; opacity: 1; }
+
+        /* Style Menu tải tài liệu */
+        .dropdown-menu-download { background: #222 !important; padding: 15px !important; border: 1px solid #444 !important; border-radius: 8px !important; min-width: 280px; }
+        .download-links-group { display: flex; flex-direction: column; gap: 8px; }
+        .download-links-group .btn-download-item { text-align: left; padding: 8px 12px; font-size: 12.5px; color: #fff; background: #333; border: 1px solid #444; border-radius: 4px; display: block; text-decoration: none; transition: background 0.2s; }
+        .download-links-group .btn-download-item:hover { background: #00ff88; color: #111; font-weight: bold; }
+
+        /* Quản lý lớp dữ liệu */
+        .dropdown-menu-layers { background: #222 !important; padding: 15px !important; border: 1px solid #444 !important; border-radius: 8px !important; min-width: 380px; }
+        .layer-control-item { padding: 6px 0; color: #fff; display: flex; align-items: center; justify-content: space-between; }
+        .layer-control-item .layer-label-zone { display: flex; align-items: center; gap: 6px; flex: 1; }
+        .layer-control-item label { font-weight: normal; margin-bottom: 0; cursor: pointer; color: #ddd; display: inline-flex; align-items: center; }
+        .layer-control-item select.year-selector { background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; }
+        .layer-control-item select.year-selector:hover { background: #444; }
+        .layer-control-item input[type="range"] { width: 75px; margin-left: 10px; display: inline-block; vertical-align: middle; }
+        
+        .lbl-opacity-value { font-size: 11px; color: #00c6ff; width: 35px; text-align: right; display: inline-block; font-weight: bold; }
+        .dropdown-header-custom { padding: 0 0 8px 0; color: #00c6ff; font-weight: bold; text-transform: uppercase; font-size: 12px; border-bottom: 1px solid #3a3a3a; margin-bottom: 8px; }
+
+        /* Khung Popup thuộc tính thửa đất */
+        .ol-popup { position: absolute; background-color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 0; border-radius: 12px; bottom: 14px; left: -50px; min-width: 290px; max-width: 330px; z-index: 2000; overflow: hidden; }
+        .ol-popup:after, .ol-popup:before { top: 100%; border: solid transparent; content: " "; height: 0; width: 0; position: absolute; pointer-events: none; }
+        .ol-popup:after { border-top-color: white; border-width: 10px; left: 48px; margin-left: -10px; }
+        .ol-popup:before { border-top-color: transparent; border-width: 11px; left: 48px; margin-left: -11px; }
+        .popup-header { background: linear-gradient(135deg, #2ea44f, #00c6ff); color: white; padding: 12px 15px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .ol-popup-closer { text-decoration: none; font-size: 16px; color: white; font-weight: bold; cursor: pointer; }
+        .ol-popup-closer:after { content: "✖"; }
+        .popup-body { padding: 12px 15px; overflow-y: auto; max-height: 280px; }
+        .info-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ebeef5; font-size: 13px; }
+        .info-item:last-child { border-bottom: none; }
+        .info-label { color: #909399; font-weight: 500; }
+        .info-value { color: #303133; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+
+        /* Phản ánh Chatbox */
+        .chatbox-bubble-toggle { position: fixed; bottom: 20px; right: 20px; width: 52px; height: 52px; background: linear-gradient(135deg, #2ea44f, #00c6ff); border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 2500; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 22px; transition: transform 0.2s ease; }
+        .chatbox-bubble-toggle:hover { transform: scale(1.06); }
+        
+        .user-feedback-chatbox { display: none; position: fixed; bottom: 85px; right: 20px; width: 320px; height: 380px; background: #fff; border-radius: 12px; box-shadow: 0 6px 25px rgba(0,0,0,0.2); border: 1px solid #ccc; z-index: 2500; flex-direction: column; overflow: hidden; }
+        .chatbox-header { background: #222; color: #00c6ff; padding: 12px 15px; font-weight: bold; font-size: 13px; text-transform: uppercase; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .chatbox-body { flex: 1; padding: 12px; background: #f9fbfd; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.4; word-break: break-word; }
+        .chat-msg.bot { background: #e4e7ed; color: #333; align-self: flex-start; border-top-left-radius: 1px; }
+        .chat-msg.user { background: #2ea44f; color: #fff; align-self: flex-end; border-top-right-radius: 1px; }
+        .chatbox-footer { padding: 8px 10px; background: #fff; border-top: 1px solid #eee; display: flex; gap: 6px; }
+        .chatbox-footer input { flex: 1; height: 32px; border: 1px solid #ddd; border-radius: 4px; padding: 0 10px; font-size: 12.5px; outline: none; }
+        .chatbox-footer button { background: #2ea44f; color: #fff; border: none; padding: 0 12px; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: pointer; }
+        .chatbox-footer button:hover { background: #237e3d; }
+
+        .system-footer-disclaimer { position: fixed; bottom: 5px; left: 50%; transform: translateX(-50%); z-index: 2400; background: rgba(26, 37, 47, 0.85); color: #ffffff; padding: 4px 15px; border-radius: 20px; font-size: 11px; letter-spacing: 0.3px; pointer-events: none; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); white-space: nowrap; }
+
+        /* ── MODAL ĐĂNG NHẬP STYLE NÔNG LÂM GLASSMORPHISM ── */
+        .modal-login-backdrop {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17, 26, 34, 0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 99999; align-items: center; justify-content: center; padding: 20px;
+        }
+        
+        .login-glass-card {
+            background: linear-gradient(135deg, rgba(27, 94, 32, 0.9) 0%, rgba(0, 77, 64, 0.95) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px;
+            padding: 35px 30px; width: 100%; max-width: 400px;
+            box-shadow: 0 25px 55px rgba(0, 0, 0, 0.5); text-align: center;
+            position: relative; animation: modalFadeIn 0.3s ease;
+        }
+        @keyframes modalFadeIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .login-glass-card h2 { color: #ffffff; font-weight: 800; font-size: 24px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .login-glass-card p { color: #b0bec5; font-size: 13px; margin-bottom: 25px; }
+
+        .glass-form-group { text-align: left; margin-bottom: 18px; }
+        .glass-form-group label { color: #eceff1; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 6px; display: block; letter-spacing: 0.5px; }
+        
+        .glass-input {
+            width: 100%; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px; height: 44px; padding: 0 15px; color: #ffffff; font-size: 14px; outline: none;
+        }
+        .glass-input:focus { background: rgba(255, 255, 255, 0.15); border-color: #00ff88; box-shadow: 0 0 15px rgba(0, 255, 136, 0.25); }
+        select.glass-input option { background: #111a22; color: #fff; }
+
+        .btn-glass-submit {
+            width: 100%; height: 46px; background: linear-gradient(90deg, #00c6ff 0%, #00ff88 100%);
+            border: none; border-radius: 10px; color: #111a22; font-size: 14px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px; cursor: pointer; margin-top: 10px;
+            box-shadow: 0 8px 25px rgba(0, 255, 136, 0.3); transition: all 0.2s;
+        }
+        .btn-glass-submit:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0, 255, 136, 0.45); }
+        
+        .btn-close-modal-x { position: absolute; top: 15px; right: 20px; color: rgba(255,255,255,0.6); font-size: 20px; cursor: pointer; text-decoration: none; }
+        .btn-close-modal-x:hover { color: #fff; }
+        #main-login-error { color: #ff5252; font-size: 13px; font-weight: 600; margin-top: 15px; display: none; }
+
+        @media (max-width: 767px) {
+            .system-main-title { top: 105px; width: 90%; }
+            .search-box-panel { min-width: 280px; right: -50px; left: auto; }
+            .dropdown-menu-layers, .dropdown-menu-measure, .dropdown-menu-download { min-width: 100%; max-height: 70vh; overflow-y: auto; }
+            .ol-popup { position: fixed; left: 0!important; right: 0!important; bottom: 0!important; width: 100%!important; max-width: 100%!important; border-radius: 16px 16px 0 0; }
+            .ol-popup:after, .ol-popup:before { display: none !important; }
+            .navbar-nav { margin: 0; background: #222; }
+            .user-feedback-chatbox { width: 280px; height: 320px; bottom: 80px; right: 10px; }
+            .chatbox-bubble-toggle { bottom: 15px; right: 15px; }
+            .legend-panel { top: 170px; left: 15px; max-height: 250px; }
+            .system-footer-disclaimer { font-size: 10px; padding: 3px 10px; width: 90%; white-space: normal; bottom: 2px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="webgis-container">
+        <nav class="navbar navbar-inverse" style="margin-bottom:0; border-radius: 0; z-index: 1000;">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-menu" aria-expanded="false">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                </div>
+                
+                <div class="collapse navbar-collapse" id="navbar-collapse-menu">
+                    <div class="navbar-form navbar-left" id="search-tool-wrapper">
+                        <div class="search-container-dropdown">
+                            <button type="button" class="btn-search-toggle" id="btn-toggle-search-panel">
+                                <span class="glyphicon glyphicon-search"></span> Tìm kiếm <span class="caret"></span>
+                            </button>
+                            
+                            <div class="search-box-panel" id="search-box-panel">
+                                <select class="search-type-select" id="search-type-selector">
+                                    <option value="search-thua" selected>1. Tìm theo Số tờ/Số thửa</option>
+                                    <option value="search-toado">2. Tìm theo Tọa độ (X, Y)</option>
+                                    <option value="search-diachi">3. Tìm theo Địa chỉ</option>
+                                </select>
+
+                                <div class="search-input-group active" id="group-search-thua">
+                                    <input type="text" id="search-id-input" class="form-control" placeholder="Cú pháp: sốtờ-sốthửa (VD: 10-250)">
+                                    <button class="btn btn-primary btn-block btn-sm" type="button" id="btn-search-id">Tìm thửa</button>
+                                </div>
+
+                                <div class="search-input-group" id="group-search-toado">
+                                    <input type="text" id="search-coord-x" class="form-control" placeholder="Nhập tọa độ X...">
+                                    <input type="text" id="search-coord-y" class="form-control" placeholder="Nhập tọa độ Y...">
+                                    <button class="btn btn-success btn-block btn-sm" type="button" id="btn-search-coord">Tìm tọa độ</button>
+                                </div>
+
+                                <div class="search-input-group" id="group-search-diachi">
+                                    <input type="text" id="search-address-input" class="form-control" placeholder="Nhập địa chỉ...">
+                                    <button class="btn btn-warning btn-block btn-sm" type="button" id="btn-search-address">Tìm địa chỉ</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ul class="nav navbar-nav navbar-right">
+                        <li class="dropdown" id="btn-download-doc-wrapper">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" style="color: #00ff88; font-weight: bold;">
+                                <span class="glyphicon glyphicon-download-alt"></span> Tải tài liệu <span class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-download">
+                                <div class="dropdown-header-custom" style="color: #00ff88;">Danh sách tài liệu hệ thống</div>
+                                <div class="download-links-group">
+                                    <a href="https://drive.google.com/file/d/1Q5Wc7i5CckJ9F1CzVrpmypZhpLsEqvmf/view?usp=drive_link" target="_blank" class="btn-download-item">
+                                        <span class="glyphicon glyphicon-file"></span> 1. Bản đồ Địa chính xã Da Sar
+                                    </a>
+                                    <a href="https://drive.google.com/file/d/17RBsxTn_L2ixSU0cSSbnNNfho6ZOI0PP/view?usp=drive_link" target="_blank" class="btn-download-item">
+                                        <span class="glyphicon glyphicon-map-marker"></span> 2. Bản đồ Địa chính xã Da Nhim
+                                    </a>
+                                    <a href="https://drive.google.com/file/d/1FLtasYqv4x9KBX_rzNs_ff4Cbz9BkJI9/view?usp=drive_link" target="_blank" class="btn-download-item">
+                                        <span class="glyphicon glyphicon-list-alt"></span> 3. Bản đồ Địa chính xã Da Chais
+                                    </a>
+                                </div>
+                            </ul>
+                        </li>
+
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" style="color: #ffaa00; font-weight: bold;">
+                                <span class="glyphicon glyphicon-wrench"></span> Công cụ đo đạc <span class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-measure">
+                                <div class="dropdown-header-custom" style="color: #ffaa00;">Tùy chọn phép đo</div>
+                                <div class="measure-btn-group">
+                                    <button type="button" class="btn btn-sm btn-info btn-block" id="btn-measure-distance">
+                                        <span class="glyphicon glyphicon-resize-horizontal"></span> Đo khoảng cách
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-warning btn-block" id="btn-measure-area">
+                                        <span class="glyphicon glyphicon-fullscreen"></span> Đo diện tích
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger btn-block" id="btn-measure-clear">
+                                        <span class="glyphicon glyphicon-trash"></span> Xóa kết quả vẽ
+                                    </button>
+                                </div>
+                            </ul>
+                        </li>
+
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" style="color: #00c6ff; font-weight: bold;">
+                                <span class="glyphicon glyphicon-tasks"></span> Quản lý lớp dữ liệu <span class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-layers">
+                                <div class="dropdown-header-custom">Hệ thống Lớp Nền</div>
+                                <li class="layer-control-item"><div class="layer-label-zone"><label><input type="radio" name="base-layer-radio" id="rad-satellite" checked> Ảnh vệ tinh Esri</label></div></li>
+                                <li class="layer-control-item"><div class="layer-label-zone"><label><input type="radio" name="base-layer-radio" id="rad-osm" > Bản đồ nền OSM</label></div></li>
+                                
+                                <li role="separator" class="divider" style="background-color: #333; margin: 10px 0;"></li>
+                                <div class="dropdown-header-custom">Lớp dữ liệu không gian</div>
+                                <li class="layer-control-item">
+                                    <div class="layer-label-zone"><label><input type="checkbox" id="chk-ranhthua" checked> Ranh thửa đất</label></div>
+                                    <input type="range" id="sld-ranhthua" min="0" max="1" step="0.01" value="1">
+                                </li>
+                                <li class="layer-control-item">
+                                    <div class="layer-label-zone"><label><input type="checkbox" id="chk-hientrang" checked> Hiện trạng SDĐ (HT)</label></div>
+                                    <input type="range" id="sld-hientrang" min="0" max="1" step="0.01" value="0.75">
+                                    <span class="lbl-opacity-value" id="val-sld-hientrang">75%</span>
+                                </li>
+                                <li class="layer-control-item">
+                                    <div class="layer-label-zone">
+                                        <select id="sel-nam-quyhoach" class="year-selector"><option value="2021-2031" selected>2021-2031</option></select>
+                                        <label><input type="checkbox" id="chk-quyhoach"> Quy hoạch SDĐ</label>
+                                    </div>
+                                    <input type="range" id="sld-quyhoach" min="0" max="1" step="0.01" value="0.7">
+                                </li>
+                                <li class="layer-control-item">
+                                    <div class="layer-label-zone"><label><input type="checkbox" id="chk-giaothong"> Giao thông</label></div>
+                                    <input type="range" id="sld-giaothong" min="0" max="1" step="0.01" value="1">
+                                </li>
+                                <li class="layer-control-item">
+                                    <div class="layer-label-zone"><label><input type="checkbox" id="chk-thuyvan"> Thuỷ văn</label></div>
+                                    <input type="range" id="sld-thuyvan" min="0" max="1" step="0.01" value="1">
+                                </li>
+                            </ul>
+                        </li>
+
+                        <li>
+                            <a href="#" id="btn-navbar-auth" style="color: #ffffff; background-color: #2ea44f; font-weight: bold; margin: 8px 10px; padding: 7px 15px; border-radius: 4px; text-align: center;">
+                                <span class="glyphicon glyphicon-log-in"></span> Đăng nhập
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>   
+
+        <div class="system-main-title">
+            <h1>Tra cứu thông tin thửa đất xã LẠC DƯƠNG</h1>
+        </div>
+       
+        <div id="map"></div>
+
+        <div class="system-footer-disclaimer">
+            Web chỉ mang tính chất tham khảo, mọi thông tin chính thức liên hệ VPDKDD
+        </div>
+
+        <div id="legend-panel" class="legend-panel">
+            <h4>Chú giải loại đất (TT 08/BTNMT)</h4>
+            <div class="legend-section-title">1. Nhóm đất nông nghiệp</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FFFF00;"></div><span class="legend-text"><b>LUC</b> - Đất chuyên trồng lúa nước</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FFFFCC;"></div><span class="legend-text"><b>LUK</b> - Đất trồng lúa nước còn lại</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #EAFB75;"></div><span class="legend-text"><b>BHK</b> - Đất trồng cây hàng năm khác</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #99E600;"></div><span class="legend-text"><b>CLN</b> - Đất trồng cây lâu năm</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #D3FFD3;"></div><span class="legend-text"><b>RSX</b> - Đất rừng sản xuất</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #85E385;"></div><span class="legend-text"><b>RPH</b> - Đất rừng phòng hộ</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #33A02C;"></div><span class="legend-text"><b>RDD</b> - Đất rừng đặc dụng</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #CCFFFF;"></div><span class="legend-text"><b>NTS</b> - Đất nuôi trồng thủy sản</span></div>
+
+            <div class="legend-section-title">2. Nhóm đất phi nông nghiệp</div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #feb8b8;"></div><span class="legend-text"><b>ONT</b> - Đất ở tại nông thôn</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #e425d4;"></div><span class="legend-text"><b>ODT</b> - Đất ở tại đô thị</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #E600FF;"></div><span class="legend-text"><b>TSC</b> - Đất xây dựng trụ sở cơ quan</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #737373;"></div><span class="legend-text"><b>DGT</b> - Đất giao thông</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #00A8FF;"></div><span class="legend-text"><b>DTL</b> - Đất thủy lợi</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FFFFB3;"></div><span class="legend-text"><b>DGD</b> - Đất cơ sở giáo dục và đào tạo</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #E6B3E6;"></div><span class="legend-text"><b>DYT</b> - Đất cơ sở y tế</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #E60084;"></div><span class="legend-text"><b>DCH</b> - Đất chợ</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #FFB3B3;"></div><span class="legend-text"><b>DKN</b> - Đất khu vui chơi, giải trí công cộng</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #B3B3FF;"></div><span class="legend-text"><b>TON</b> - Đất cơ sở tôn giáo</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #848484;"></div><span class="legend-text"><b>NTD</b> - Đất nghĩa trang, nhà tang lễ</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #E699B3;"></div><span class="legend-text"><b>SKC</b> - Đất cơ sở sản xuất phi nông nghiệp</span></div>
+        </div>
+
+        <div id="popup" class="ol-popup">
+            <div class="popup-header">
+                <span id="popup-title">Thông tin bản đồ</span>
+                <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+            </div>
+            <div id="popup-body" class="popup-body">
+                <div id="popup-content"></div>
+            </div>
+        </div>
+
+        <div class="chatbox-bubble-toggle" id="btn-toggle-chatbox"><span class="glyphicon glyphicon-comment"></span></div>
+        <div class="user-feedback-chatbox" id="chatbox-panel">
+            <div class="chatbox-header">
+                <span>Phản ánh của người dùng</span>
+                <span class="glyphicon glyphicon-remove" id="btn-close-chatbox" style="cursor: pointer; font-size: 11px;"></span>
+            </div>
+            <div class="chatbox-body" id="chatbox-messages">
+                <div class="chat-msg bot">Xin chào! Hệ thống tra cứu thông tin thửa đất xã Lạc Dương xin nghe. Bạn có phản ánh hoặc góp ý gì không ạ?</div>
+            </div>
+            <div class="chatbox-footer">
+                <input type="text" id="chatbox-input" placeholder="Nhập ý kiến phản ánh tại đây...">
+                <button type="button" id="btn-send-chat">Gửi</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-login-backdrop" id="login-modal">
+        <div class="login-glass-card">
+            <a href="#" class="btn-close-modal-x" id="btn-close-modal">&times;</a>
+            <h2>Đăng Nhập</h2>
+            <p>Đăng nhập để mở khóa chức năng</p>
+            
+            <div class="glass-form-group">
+                <label for="login-level">Cấp độ phân quyền</label>
+                <select id="login-level" class="glass-input">
+                    <option value="coban">Quyền Cơ bản (Tra cứu)</option>
+                    <option value="nangcao">Quyền Nâng cao (Tải tài liệu)</option>
+                </select>
+            </div>
+            
+            <div class="glass-form-group">
+                <label for="login-user">Tài khoản</label>
+                <input type="text" id="login-user" class="glass-input" value="admin" autocomplete="off">
+            </div>
+            
+            <div class="glass-form-group">
+                <label for="login-pass">Mật khẩu</label>
+                <input type="password" id="login-pass" class="glass-input" placeholder="••••••••">
+            </div>
+            
+            <button type="button" class="btn-glass-submit" id="btn-submit-login">Đăng nhập</button>
+            <div id="main-login-error">Sai tài khoản hoặc mật khẩu!</div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/build/ol.js"></script>
+    
+    <script>
+        var isCurrentLoggedIn = false; // Biến theo dõi trạng thái đăng nhập
+
+        // --- LOGIC AUTHENTICATION (XỬ LÝ ĐĂNG NHẬP / ĐĂNG XUẤT VIA MODAL) ---
+        $(document).ready(function() {
+            $("#btn-navbar-auth").click(function(e) {
+                e.preventDefault();
+                if (isCurrentLoggedIn) {
+                    isCurrentLoggedIn = false;
+                    $("#search-tool-wrapper").hide();
+                    $("#btn-download-doc-wrapper").hide();
+                    $("#login-pass").val("");
+                    $("#main-login-error").hide();
+                    highlightSource.clear();
+                    popupOverlay.setPosition(undefined);
+                    $(this).html('<span class="glyphicon glyphicon-log-in"></span> Đăng nhập').css("background-color", "#2ea44f");
+                    alert("Đã đăng xuất tài khoản thành công!");
+                } else {
+                    $("#login-modal").css("display", "flex").fadeIn(200);
+                }
+            });
+
+            $("#btn-close-modal").click(function(e) { e.preventDefault(); $("#login-modal").fadeOut(150); });
+            
+            $("#login-modal").click(function(e) {
+                if ($(e.target).hasClass('modal-login-backdrop')) { $("#login-modal").fadeOut(150); }
+            });
+
+            $("#btn-submit-login").click(function() {
+                var level = $("#login-level").val();
+                var user = $("#login-user").val().trim();
+                var pass = $("#login-pass").val().trim();
+
+                if (level === "coban") {
+                    if (user === "admin" && pass === "123") {
+                        isCurrentLoggedIn = true;
+                        $("#search-tool-wrapper").fadeIn();
+                        $("#btn-download-doc-wrapper").hide();
+                        $("#login-modal").fadeOut(200);
+                        $("#btn-navbar-auth").html('<span class="glyphicon glyphicon-log-out"></span> Cơ bản (Thoát)').css("background-color", "#d9534f");
+                        alert("Đăng nhập thành công với quyền CƠ BẢN!");
+                    } else {
+                        $("#main-login-error").text("Mật khẩu quyền Cơ bản không đúng (Gợi ý: Đoán xem)").show();
+                    }
+                } else if (level === "nangcao") {
+                    if (user === "admin" && pass === "321") {
+                        isCurrentLoggedIn = true;
+                        $("#search-tool-wrapper").fadeIn();
+                        $("#btn-download-doc-wrapper").fadeIn();
+                        $("#login-modal").fadeOut(200);
+                        $("#btn-navbar-auth").html('<span class="glyphicon glyphicon-log-out"></span> Nâng cao (Thoát)').css("background-color", "#d9534f");
+                        alert("Đăng nhập thành công với quyền NÂNG CAO!");
+                    } else {
+                        $("#main-login-error").text("Mật khẩu quyền Nâng cao không đúng (Gợi ý: Đoán xem)").show();
+                    }
+                }
+            });
+
+            $("#login-pass").keypress(function(e) { if (e.which == 13) $("#btn-submit-login").click(); });
+        });
+
+        // --- CẤU HÌNH LAYER VÀ KHÔNG GIAN BẢN ĐỒ ---
+        var extent4326 = [108.452026367188, 11.9960775375366, 108.684234619141, 12.1881265640259];
+        var osmLayer = new ol.layer.Tile({ title: 'OSM', visible: false, source: new ol.source.OSM() });
+        var satelliteLayer = new ol.layer.Tile({ 
+            title: 'Satellite', visible: true, 
+            source: new ol.source.XYZ({ url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', maxZoom: 19 }) 
+        });
+
+        var GEOSERVER_URL = 'http://localhost:8082/geoserver/wms';
+        var WORKSPACE = 'XaLacDuong';
+        var MAIN_LAYER = 'XaLacDuong';
+
+        function makeWmsLayer(title, layerName, visible) {
+            return new ol.layer.Image({
+                title: title, visible: visible,
+                source: new ol.source.ImageWMS({
+                    url: GEOSERVER_URL,
+                    params: { 'LAYERS': WORKSPACE + ':' + layerName, 'FORMAT': 'image/png', 'VERSION': '1.1.1', 'TRANSPARENT': true, 'SRS': 'EPSG:4326' },
+                    ratio: 1
+                })
+            });
+        }
+
+        var ranhthuaLayer = makeWmsLayer('Ranh thửa', MAIN_LAYER, true);
+        var hientrangLayer = makeWmsLayer('Hiện trạng SDĐ', 'HT', true);
+        var quyhoachLayer = makeWmsLayer('Quy hoạch SDĐ', 'QuyHoachSDD', false);
+        var giaothongLayer = makeWmsLayer('Giao thông', 'bl_giaothong', false);
+        var thuyvanLayer = makeWmsLayer('Thuỷ văn', 'bl_thuyvan', false);
+
+        hientrangLayer.setOpacity(0.75);
+        quyhoachLayer.setOpacity(0.7);
+
+        // Highlight layer ranh thửa
+        var highlightSource = new ol.source.Vector();
+        var highlightVectorLayer = new ol.layer.Vector({
+            source: highlightSource,
+            style: new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(255, 235, 59, 0.45)' }), 
+                stroke: new ol.style.Stroke({ color: '#f57c00', width: 3.5 })     
+            }), zIndex: 999
+        });
+
+        // Lớp Vector quản lý hình vẽ của công cụ đo đạc
+        var measureSource = new ol.source.Vector();
+        var measureVectorLayer = new ol.layer.Vector({
+            source: measureSource,
+            style: new ol.style.Style({
+                fill: new ol.style.Fill({ color: 'rgba(255, 170, 0, 0.2)' }),
+                stroke: new ol.style.Stroke({ color: '#ffaa00', lineDash: [5, 5], width: 3 }),
+                image: new ol.style.Circle({
+                    radius: 6,
+                    fill: new ol.style.Fill({ color: '#ffaa00' }),
+                    stroke: new ol.style.Stroke({ color: '#ffffff', width: 2 })
+                })
+            }),
+            zIndex: 1000
+        });
+
+        var container = document.getElementById('popup');
+        var content = document.getElementById('popup-content');
+        var closer = document.getElementById('popup-closer');
+
+        var popupOverlay = new ol.Overlay({ element: container, autoPan: true, autoPanAnimation: { duration: 250 } });
+
+        closer.onclick = function () { popupOverlay.setPosition(undefined); highlightSource.clear(); closer.blur(); return false; };
+
+        var map = new ol.Map({
+            layers: [osmLayer, satelliteLayer, ranhthuaLayer, hientrangLayer, quyhoachLayer, giaothongLayer, thuyvanLayer, highlightVectorLayer, measureVectorLayer],
+            overlays: [popupOverlay],
+            target: 'map',
+            view: new ol.View({ projection: 'EPSG:4326', center: ol.extent.getCenter(extent4326), zoom: 11 })
+        });
+
+        map.getView().fit(extent4326, { padding: [150, 150, 150, 150], maxZoom: 12, duration: 1200 });
+
+        // NÚT CHÚ THÍCH LOẠI ĐẤT
+        var legendButton = document.createElement('button');
+        legendButton.innerHTML = '<span class="legend-icon">📋</span><span>CHÚ THÍCH</span>';
+        var legendElement = document.createElement('div');
+        legendElement.className = 'ol-legend ol-unselectable ol-control';
+        legendElement.appendChild(legendButton);
+        map.addControl(new ol.control.Control({ element: legendElement }));
+
+        legendButton.addEventListener('click', function (e) { e.stopPropagation(); $("#legend-panel").fadeToggle(200); }, false);
+
+        function generateRanhThuaHtml(properties) {
+            var keyMapping = { 'SHBANDO': 'Số Tờ Bản Đồ', 'SHTHUA': 'Số Thửa Đất', 'KHLOAIDAT': 'Loại Đất', 'DIENTICH': 'Diện Tích', 'TENCHU': 'Chủ Sử Dụng' };
+            var htmlContent = "";
+            for (var k in keyMapping) {
+                if (properties.hasOwnProperty(k)) {
+                    var val = properties[k];
+                    if (k === 'DIENTICH') val = parseFloat(val).toFixed(1) + " m²";
+                    htmlContent += "<div class='info-item'><span class='info-label'>" + keyMapping[k] + "</span><span class='info-value'>" + val + "</span></div>";
+                }
+            }
+            return htmlContent;
+        }
+
+        // --- SỰ KIỆN CLICK BẢN ĐỒ LẤY THÔNG TIN THỬA ĐẤT ---
+        map.on('singleclick', function (evt) {
+            if (window.currentMeasureInteraction) return;
+
+            var viewResolution = map.getView().getResolution();
+            var url = ranhthuaLayer.getSource().getFeatureInfoUrl(evt.coordinate, viewResolution, map.getView().getProjection(), { 'INFO_FORMAT': 'application/json' });
+            if (url) {
+                fetch(url).then(function (res) { return res.json(); }).then(function (data) {
+                    if (data.features && data.features.length > 0) {
+                        var featureGeoJson = data.features[0];
+                        content.innerHTML = generateRanhThuaHtml(featureGeoJson.properties);
+                        popupOverlay.setPosition(evt.coordinate);
+                        
+                        highlightSource.clear();
+                        var olFeature = (new ol.format.GeoJSON()).readFeature(featureGeoJson);
+                        highlightSource.addFeature(olFeature);
+                    } else { popupOverlay.setPosition(undefined); highlightSource.clear(); }
+                });
+            }
+        });
+
+        // ── MODULE ĐO ĐẠC ──
+        var drawInteraction; 
+        var measureTooltipElement;
+        var measureTooltip;
+        window.currentMeasureInteraction = null;
+
+        function formatLength(line) {
+            var coordinates = line.getCoordinates();
+            var length = 0;
+            for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
+                length += ol.sphere.getDistance(coordinates[i], coordinates[i + 1]);
+            }
+            return (length > 1000) ? (length / 1000).toFixed(2) + ' km' : length.toFixed(1) + ' m';
+        }
+
+        function formatArea(polygon) {
+            var area = ol.sphere.getArea(polygon, { projection: 'EPSG:4326' });
+            return (area > 1000000) ? (area / 1000000).toFixed(2) + ' km²' : area.toFixed(1) + ' m²';
+        }
+
+        function createMeasureTooltip() {
+            if (measureTooltipElement) { measureTooltipElement.parentNode.removeChild(measureTooltipElement); }
+            measureTooltipElement = document.createElement('div');
+            measureTooltipElement.className = 'ol-tooltip ol-tooltip-measure';
+            measureTooltip = new ol.Overlay({
+                element: measureTooltipElement,
+                offset: [0, -15],
+                positioning: 'bottom-center'
+            });
+            map.addOverlay(measureTooltip);
+        }
+
+        function addMeasureInteraction(typeStr) {
+            if (drawInteraction) map.removeInteraction(drawInteraction);
+            popupOverlay.setPosition(undefined);
+            highlightSource.clear();
+
+            createMeasureTooltip();
+
+            drawInteraction = new ol.interaction.Draw({
+                source: measureSource,
+                type: typeStr,
+                style: new ol.style.Style({
+                    fill: new ol.style.Fill({ color: 'rgba(255, 170, 0, 0.15)' }),
+                    stroke: new ol.style.Stroke({ color: '#ffaa00', lineDash: [5, 5], width: 2.5 }),
+                    image: new ol.style.Circle({
+                        radius: 5,
+                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1.5 }),
+                        fill: new ol.style.Fill({ color: '#ffaa00' })
+                    })
+                })
+            });
+            
+            map.addInteraction(drawInteraction);
+            window.currentMeasureInteraction = drawInteraction;
+
+            var listener;
+            drawInteraction.on('drawstart', function(evt) {
+                var sketchFeature = evt.feature;
+                var tooltipCoord = evt.coordinate;
+
+                listener = sketchFeature.getGeometry().on('change', function(e) {
+                    var geom = e.target;
+                    var outputText;
+                    if (geom instanceof ol.geom.Polygon) {
+                        outputText = formatArea(geom);
+                        tooltipCoord = geom.getInteriorPoint().getCoordinates();
+                    } else if (geom instanceof ol.geom.LineString) {
+                        outputText = formatLength(geom);
+                        tooltipCoord = geom.getLastCoordinate();
+                    }
+                    measureTooltipElement.innerHTML = outputText;
+                    measureTooltip.setPosition(tooltipCoord);
+                });
+            });
+
+            drawInteraction.on('drawend', function() {
+                measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
+                measureTooltip.setOffset([0, -7]);
+                measureTooltipElement = null;
+                createMeasureTooltip();
+                ol.Observable.unByKey(listener);
+                
+                map.removeInteraction(drawInteraction);
+                window.currentMeasureInteraction = null;
+            });
+        }
+
+        // --- TÌM KIẾM SỐ TỜ / SỐ THỬA QUA WFS ---
+        function searchParcelById() {
+            var rawVal = $("#search-id-input").val().trim();
+            var parts = rawVal.split(/[-/, ]+/);
+            if (parts.length < 2) { alert("Vui lòng nhập đúng cú pháp: 'SốTờ-SốThửa' (Ví dụ: 10-250)"); return; }
+            var soTo = parts[0].trim(); var soThua = parts[1].trim();
+
+            var cqlFilter = "SHBANDO='" + soTo + "' AND SHTHUA='" + soThua + "'";
+            var wfsUrl = GEOSERVER_URL.replace('/wms', '/wfs') + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + WORKSPACE + ":" + MAIN_LAYER + "&outputFormat=application/json&srsname=EPSG:4326&CQL_FILTER=" + encodeURIComponent(cqlFilter);
+
+            fetch(wfsUrl).then(function(res) { return res.json(); }).then(function(data) {
+                if (data.features && data.features.length > 0) {
+                    var featureGeoJson = data.features[0];
+                    highlightSource.clear();
+                    var olFeature = (new ol.format.GeoJSON()).readFeature(featureGeoJson);
+                    highlightSource.addFeature(olFeature);
+
+                    var geom = olFeature.getGeometry();
+                    if (geom) {
+                        var extent = geom.getExtent();
+                        map.getView().fit(extent, { size: map.getSize(), padding: [100, 100, 100, 100], maxZoom: 19, duration: 1000 });
+                        content.innerHTML = generateRanhThuaHtml(featureGeoJson.properties);
+                        popupOverlay.setPosition(ol.extent.getCenter(extent));
+                        $("#search-box-panel").fadeOut(150);
+                    }
+                } else { alert("Không tìm thấy dữ liệu thửa đất này!"); }
+            }).catch(function(err) { alert("Lỗi kết nối cơ sở dữ liệu không gian WFS!"); });
+        }
+
+        // --- ĐIỀU KHIỂN PANEL VÀ CÁC CHỨC NĂNG PHỤ TRỢ ---
+        $(function() {
+            $("#btn-measure-distance").click(function() {
+                addMeasureInteraction('LineString');
+                alert("Đã bật Đo khoảng cách. Nhấp chuột trái để vẽ các điểm mốc, Click đúp để kết thúc đoạn đo.");
+            });
+
+            $("#btn-measure-area").click(function() {
+                addMeasureInteraction('Polygon');
+                alert("Đã bật Đo diện tích. Nhấp chọn từng điểm ranh giới để khép vùng, Click đúp để hoàn tất.");
+            });
+
+            $("#btn-measure-clear").click(function() {
+                if (drawInteraction) map.removeInteraction(drawInteraction);
+                window.currentMeasureInteraction = null;
+                measureSource.clear();
+                var staticTooltips = document.querySelectorAll('.ol-tooltip-static, .ol-tooltip-measure');
+                staticTooltips.forEach(function(el) { if (el.parentNode) el.parentNode.removeChild(el); });
+                alert("Đã xóa sạch dữ liệu và nhãn đo đạc!");
+            });
+
+            $("#btn-toggle-search-panel").click(function(e) { e.stopPropagation(); $("#search-box-panel").fadeToggle(150); });
+            $("#btn-search-id").click(function() { searchParcelById(); });
+            $("#search-id-input").keypress(function(e) { if (e.which == 13) searchParcelById(); });
+
+            $("#search-type-selector").change(function() {
+                $(".search-input-group").removeClass("active");
+                if($(this).val() === "search-thua") $("#group-search-thua").addClass("active");
+                if($(this).val() === "search-toado") $("#group-search-toado").addClass("active");
+                if($(this).val() === "search-diachi") $("#group-search-diachi").addClass("active");
+            });
+
+            $("#btn-search-coord").click(function() {
+                var x = parseFloat($("#search-coord-x").val());
+                var y = parseFloat($("#search-coord-y").val());
+                if(!isNaN(x) && !isNaN(y)) {
+                    map.getView().setCenter([x, y]);
+                    map.getView().setZoom(17);
+                    $("#search-box-panel").fadeOut(150);
+                } else { alert("Vui lòng nhập đúng định dạng số!"); }
+            });
+
+            $('input[name="base-layer-radio"]').change(function() {
+                osmLayer.setVisible($("#rad-osm").is(":checked"));
+                satelliteLayer.setVisible($("#rad-satellite").is(":checked"));
+            });
+
+            $("#chk-ranhthua").change(function() { ranhthuaLayer.setVisible(this.checked); });
+            $("#sld-ranhthua").on("input change", function() { ranhthuaLayer.setOpacity(parseFloat(this.value)); });
+            $("#chk-hientrang").change(function() { hientrangLayer.setVisible(this.checked); });
+            $("#sld-hientrang").on("input change", function() { hientrangLayer.setOpacity(parseFloat(this.value)); $("#val-sld-hientrang").text(Math.round(this.value * 100) + "%"); });
+            $("#chk-quyhoach").change(function() { quyhoachLayer.setVisible(this.checked); });
+            $("#sld-quyhoach").on("input change", function() { quyhoachLayer.setOpacity(parseFloat(this.value)); });
+            $("#chk-giaothong").change(function() { giaothongLayer.setVisible(this.checked); });
+            $("#chk-thuyvan").change(function() { thuyvanLayer.setVisible(this.checked); });
+
+            // Chatbox phản hồi
+            $("#btn-toggle-chatbox").click(function(e) { e.stopPropagation(); $("#chatbox-panel").fadeToggle(200).css("display", "flex"); });
+            $("#btn-close-chatbox").click(function(e) { e.stopPropagation(); $("#chatbox-panel").fadeOut(200); });
+            
+            function processChatSubmission() {
+                var currentTxt = $("#chatbox-input").val().trim();
+                if (currentTxt === "") return;
+                var userBubble = `<div class="chat-msg user">${currentTxt}</div>`;
+                $("#chatbox-messages").append(userBubble);
+                $("#chatbox-messages").scrollTop($("#chatbox-messages")[0].scrollHeight);
+                $("#chatbox-input").val("");
+                setTimeout(function() {
+                    var systemReply = `<div class="chat-msg bot">Đã tiếp nhận thông tin phản ánh, hệ thống sẽ kiểm tra và phản hồi sớm nhất có thể. Cảm ơn bạn!</div>`;
+                    $("#chatbox-messages").append(systemReply);
+                    $("#chatbox-messages").scrollTop($("#chatbox-messages")[0].scrollHeight);
+                }, 400);
+            }
+
+            $("#btn-send-chat").click(function() { processChatSubmission(); });
+            $("#chatbox-input").keypress(function(e) { if (e.which == 13) processChatSubmission(); });
+        });
+    </script>
+</body>
+</html>
